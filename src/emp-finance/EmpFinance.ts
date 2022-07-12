@@ -29,6 +29,7 @@ export class EmpFinance {
   boardroomVersionOfUser?: string;
 
   EMPETH_LP: Contract;
+  UTABNB_LP: Contract;
 
   EMP: ERC20;
   ESHARE: ERC20;
@@ -36,6 +37,7 @@ export class EmpFinance {
   BNB: ERC20;
   ETH: ERC20;
   BUSD: ERC20;
+  UTA: ERC20;
 
   constructor(cfg: Configuration) {
     const { deployments, externalTokens } = cfg;
@@ -51,6 +53,7 @@ export class EmpFinance {
       this.externalTokens[symbol] = new ERC20(address, provider, symbol, decimal);
     }
     this.EMP = new ERC20(deployments.Emp.address, provider, 'EMP');
+    this.UTA = new ERC20(deployments.UTA.address, provider, 'UTA');
     this.ESHARE = new ERC20(deployments.EShare.address, provider, 'ESHARE');
     this.EBOND = new ERC20(deployments.EBond.address, provider, 'EBOND');
     // this.EMPETH = new ERC20(externalTokens['EMP-ETH-LP'][0], provider, 'EMP-ETH-LP');
@@ -58,9 +61,11 @@ export class EmpFinance {
     this.BNB = this.externalTokens['WBNB'];
     this.ETH = this.externalTokens['ETH'];
     this.BUSD = this.externalTokens['BUSD'];
+    this.UTA = this.externalTokens['UTA'];
 
     // Uniswap V2 Pair
     this.EMPETH_LP = new Contract(externalTokens['EMP-ETH-LP'][0], IUniswapV2PairABI, provider);
+    this.UTABNB_LP = new Contract(externalTokens['UTA-BNB-LP'][0], IUniswapV2PairABI, provider);
 
     this.config = cfg;
     this.provider = provider;
@@ -135,6 +140,7 @@ export class EmpFinance {
    * @returns
    */
   async getLPStat(name: string): Promise<LPStat> {
+    console.log('@@@@@@@@@@ getLPStat @@@@@@@@@@@');
     const lpToken = this.externalTokens[name];
     const lpTokenSupplyBN = await lpToken.totalSupply();
     const lpTokenSupply = getDisplayBalance(lpTokenSupplyBN, 18);
@@ -160,6 +166,7 @@ export class EmpFinance {
   }
 
   async getLPStatETH(name: string): Promise<LPStat> {
+    console.log('@@@@@@@@@@ getLPStatETH @@@@@@@@@@@');
     const lpToken = this.externalTokens[name];
     const lpTokenSupplyBN = await lpToken.totalSupply();
     const lpTokenSupply = getDisplayBalance(lpTokenSupplyBN, 18);
@@ -195,6 +202,7 @@ export class EmpFinance {
    * CirculatingSupply (always equal to total supply for bonds)
    */
   async getBondStat(version: number): Promise<TokenStat> {
+    console.log('@@@@@@@@@@ getBondStat @@@@@@@@@@@');
     const { Treasury, TreasuryV2 } = this.contracts;
     const empStat = await this.getEmpStat();
     const bondEmpRatioBN = version === 0 ? await Treasury.getBondPremiumRate() : await TreasuryV2.getBondPremiumRate();
@@ -218,6 +226,7 @@ export class EmpFinance {
    * CirculatingSupply (always equal to total supply for bonds)
    */
   async getShareStat(): Promise<TokenStat> {
+    console.log('@@@@@@@@@@ getShareStat @@@@@@@@@@@');
     const { EShareRewardPool } = this.contracts;
 
     const supply = await this.ESHARE.totalSupply();
@@ -237,6 +246,7 @@ export class EmpFinance {
   }
 
   async getEmpStatInEstimatedTWAP(version: number): Promise<TokenStat> {
+    console.log('@@@@@@@@@@ getEmpStatInEstimatedTWAP @@@@@@@@@@@');
     const { Oracle, OracleV2, EmpRewardPool } = this.contracts;
     const expectedPrice = version === 0 ? await Oracle.twap(this.EMP.address, ethers.utils.parseEther('4000')) : await OracleV2.twap(this.EMP.address, ethers.utils.parseEther('4000'));
 
@@ -264,12 +274,14 @@ export class EmpFinance {
   // }
 
   async getBondsPurchasable(version: number): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getBondsPurchasable @@@@@@@@@@@');
     const { Treasury, TreasuryV2 } = this.contracts;
     // const burnableEmp = (Number(Treasury.getBurnableEmpLeft()) * 1000).toFixed(2).toString();
     return version === 0 ? Treasury.getBurnableEmpLeft() : TreasuryV2.getBurnableEmpLeft();
   }
 
   async getNodes(contract: string, user: string): Promise<BigNumber[]> {
+    console.log('@@@@@@@@@@ getNodes @@@@@@@@@@@');
     return await this.contracts[contract].getNodes(user);
   }
 
@@ -279,6 +291,7 @@ export class EmpFinance {
    * @returns
    */
   async getPoolAPRs(bank: Bank): Promise<PoolStats> {
+    console.log('@@@@@@@@@@ getPoolAPRs @@@@@@@@@@@');
     if (this.myAccount === undefined) return;
     const depositToken = bank.depositToken;
     const poolContract = this.contracts[bank.contract];
@@ -320,6 +333,11 @@ export class EmpFinance {
         TVL: TVL.toFixed(2).toString(),
       };
     } else {
+
+      console.log('bank.earnTokenName', bank.earnTokenName);
+      console.log('bank.contract', bank.contract);
+      console.log('bank.depositTokenName', bank.depositTokenName);
+      console.log('poolContract', poolContract);
       const [depositTokenPrice, stakeInPool, stat, tokenPerSecond] = await Promise.all([
         this.getDepositTokenPriceInDollars(bank.depositTokenName, depositToken),
         depositToken.balanceOf(bank.address),
@@ -342,6 +360,7 @@ export class EmpFinance {
         Number(depositTokenPrice) * Number(getDisplayBalance(stakeInPool, depositToken.decimal));
       const dailyAPR = (totalRewardPricePerDay / totalStakingTokenInPool) * 100;
       const yearlyAPR = (totalRewardPricePerYear / totalStakingTokenInPool) * 100;
+      console.log('dailyAPR', dailyAPR);
       return {
         dailyAPR: dailyAPR.toFixed(2).toString(),
         yearlyAPR: yearlyAPR.toFixed(2).toString(),
@@ -419,6 +438,7 @@ export class EmpFinance {
    * @returns
    */
   async getDepositTokenPriceInDollars(tokenName: string, token: ERC20) {
+    console.log('@@@@@@@@@@ getDepositTokenPriceInDollars @@@@@@@@@@@');
     let tokenPrice;
     if (tokenName === 'WBNB') {
       tokenPrice = await this.getWBNBPriceFromPancakeswap();
@@ -450,11 +470,13 @@ export class EmpFinance {
   //===================================================================
 
   async getCurrentEpoch(version: number): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getCurrentEpoch @@@@@@@@@@@');
     const { Treasury, TreasuryV2 } = this.contracts;
     return version === 0 ? Treasury.epoch() : TreasuryV2.epoch();
   }
 
   async getBondOraclePriceInLastTWAP(version: number): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getBondOraclePriceInLastTWAP @@@@@@@@@@@');
     const { Treasury, TreasuryV2 } = this.contracts;
     return version === 0 ? Treasury.getBondPremiumRate() : TreasuryV2.getBondPremiumRate();
   }
@@ -464,6 +486,7 @@ export class EmpFinance {
    * @param amount amount of cash to purchase bonds with.
    */
   async buyBonds(version: number, amount: string | number): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ buyBonds @@@@@@@@@@@');
     const { Treasury, TreasuryV2 } = this.contracts;
     const treasuryEmpPrice = version === 0 ? await Treasury.getEmpPrice() : await TreasuryV2.getEmpPrice();
     return version === 0 ? await Treasury.buyBonds(decimalToBalance(amount), treasuryEmpPrice) : await TreasuryV2.buyBonds(decimalToBalance(amount), treasuryEmpPrice);
@@ -474,12 +497,14 @@ export class EmpFinance {
    * @param amount amount of bonds to redeem.
    */
   async redeemBonds(version: number, amount: string): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ redeemBonds @@@@@@@@@@@');
     const { Treasury, TreasuryV2 } = this.contracts;
     const priceForEmp = version === 0 ? await Treasury.getEmpPrice() : await TreasuryV2.getEmpPrice();
     return version === 0 ? await Treasury.redeemBonds(decimalToBalance(amount), priceForEmp) : await TreasuryV2.redeemBonds(decimalToBalance(amount), priceForEmp);
   }
 
   async getTotalValueLocked(): Promise<Number> {
+    console.log('@@@@@@@@@@ getTotalValueLocked @@@@@@@@@@@');
     let totalValue = 0;
     for (const bankInfo of Object.values(bankDefinitions)) {
       const pool = this.contracts[bankInfo.contract];
@@ -517,6 +542,7 @@ export class EmpFinance {
    * @returns price of the LP token
    */
   async getLPTokenPrice(lpToken: ERC20, token: ERC20, isEmp: boolean): Promise<string> {
+    console.log('@@@@@@@@@@ getLPTokenPrice @@@@@@@@@@@');
     const totalSupply = getFullDisplayBalance(await lpToken.totalSupply(), lpToken.decimal);
     //Get amount of tokenA
     const tokenSupply = getFullDisplayBalance(await token.balanceOf(lpToken.address), token.decimal);
@@ -537,6 +563,7 @@ export class EmpFinance {
    * @returns price of the LP token
    */
   async getApeLPTokenPrice(lpToken: ERC20, token: ERC20, isEmp: boolean): Promise<string> {
+    console.log('@@@@@@@@@@ getApeLPTokenPrice @@@@@@@@@@@');
     const totalSupply = getFullDisplayBalance(await lpToken.totalSupply(), lpToken.decimal);
     //Get amount of tokenA
     const tokenSupply = getFullDisplayBalance(await token.balanceOf(lpToken.address), token.decimal);
@@ -554,6 +581,7 @@ export class EmpFinance {
     poolId: Number,
     account = this.myAccount,
   ): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ Promise @@@@@@@@@@@');
     const pool = this.contracts[poolName];
     try {
       if (earnTokenName === 'EMP' && poolName.includes('Node')) {
@@ -570,6 +598,7 @@ export class EmpFinance {
   }
 
   async stakedBalanceOnBank(poolName: ContractName, poolId: Number, sectionInUI: Number, account = this.myAccount): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ stakedBalanceOnBank @@@@@@@@@@@');
     const pool = this.contracts[poolName];
     try {
       let userInfo = sectionInUI !== 3
@@ -585,6 +614,7 @@ export class EmpFinance {
   }
   
   async claimedBalanceNode(poolName: ContractName, account = this.myAccount): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ claimedBalanceNode @@@@@@@@@@@');
     const pool = this.contracts[poolName];
     try {
       let userInfo = await pool.users(account);
@@ -596,6 +626,7 @@ export class EmpFinance {
   }
   
   async getNodePrice(poolName: ContractName, poolId: Number): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getNodePrice @@@@@@@@@@@');
     const pool = this.contracts[poolName];
     try {
       return await pool.tierAmounts(poolId);
@@ -612,6 +643,7 @@ export class EmpFinance {
    * @returns {string} Transaction hash
    */
   async stake(poolName: ContractName, poolId: Number, sectionInUI: Number, amount: BigNumber): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ stake @@@@@@@@@@@');
     const pool = this.contracts[poolName];
     return sectionInUI !== 3
       ? await pool.deposit(poolId, amount)
@@ -625,6 +657,7 @@ export class EmpFinance {
    * @returns {string} Transaction hash
    */
   async unstake(poolName: ContractName, poolId: Number, amount: BigNumber): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ unstake @@@@@@@@@@@');
     const pool = this.contracts[poolName];
     return await pool.withdraw(poolId, amount);
   }
@@ -633,6 +666,7 @@ export class EmpFinance {
    * Transfers earned token reward from given pool to my account.
    */
   async harvest(poolName: ContractName, poolId: Number, sectionInUI: Number): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ harvest @@@@@@@@@@@');
     const pool = this.contracts[poolName];
     //By passing 0 as the amount, we are asking the contract to only redeem the reward and not the currently staked token
     return sectionInUI !== 3
@@ -644,12 +678,14 @@ export class EmpFinance {
    * Harvests and withdraws deposited tokens from the pool.
    */
   async exit(poolName: ContractName, poolId: Number, account = this.myAccount): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ exit @@@@@@@@@@@');
     const pool = this.contracts[poolName];
     let userInfo = await pool.userInfo(poolId, account);
     return await pool.withdraw(poolId, userInfo.amount);
   }
 
   async fetchBoardroomVersionOfUser(): Promise<string> {
+    console.log('@@@@@@@@@@ fetchBoardroomVersionOfUser @@@@@@@@@@@');
     return 'latest';
   }
 
@@ -665,6 +701,7 @@ export class EmpFinance {
   }
 
   async getTokenPriceFromPancakeswap(tokenContract: ERC20): Promise<string> {
+    console.log('@@@@@@@@@@ getTokenPriceFromPancakeswap @@@@@@@@@@@');
     const ready = await this.provider.ready;
     if (!ready) return;
     // const { chainId } = this.config;
@@ -675,6 +712,7 @@ export class EmpFinance {
     try {
       const wftmToToken = await Fetcher.fetchPairData(wftm, token, this.provider);
       const priceInBUSD = new Route([wftmToToken], token);
+      console.log('priceInBUSD.midPrice.toFixed(4)', priceInBUSD.midPrice.toFixed(4));
       return priceInBUSD.midPrice.toFixed(4);
     } catch (err) {
       console.error(`Failed to fetch token price of ${tokenContract.symbol}: ${err}`);
@@ -682,6 +720,7 @@ export class EmpFinance {
   }
 
   async getTokenPriceFromPancakeswapETH(tokenContract: ERC20): Promise<string> {
+    console.log('@@@@@@@@@@ getTokenPriceFromPancakeswapETH @@@@@@@@@@@');
     const ready = await this.provider.ready;
     if (!ready) return;
     // const { chainId } = this.config;
@@ -696,6 +735,7 @@ export class EmpFinance {
       //   console.log('priceInBUSDETH', priceInBUSD.midPrice.toFixed(12));
 
       const priceForPeg = Number(priceInBUSD.midPrice.toFixed(12)) * 4000;
+      console.log('priceForPeg.toFixed(4)', priceForPeg.toFixed(4));
       return priceForPeg.toFixed(4);
     } catch (err) {
       console.error(`Failed to fetch token price of ${tokenContract.symbol}: ${err}`);
@@ -703,6 +743,7 @@ export class EmpFinance {
   }
 
   async getTokenPriceFromPancakeswapEMPUSD(): Promise<string> {
+    console.log('@@@@@@@@@@ getTokenPriceFromPancakeswapEMPUSD @@@@@@@@@@@');
     const ready = await this.provider.ready;
     if (!ready) return;
     // const { chainId } = this.config;
@@ -748,6 +789,7 @@ export class EmpFinance {
   // }
 
   async getWBNBPriceFromPancakeswap(): Promise<string> {
+    console.log('@@@@@@@@@@ getWBNBPriceFromPancakeswap @@@@@@@@@@@');
     const ready = await this.provider.ready;
     if (!ready) return;
     const { WBNB, BUSD } = this.externalTokens;
@@ -757,6 +799,8 @@ export class EmpFinance {
       let ftm_amount = Number(getFullDisplayBalance(ftm_amount_BN, WBNB.decimal));
       let fusdt_amount_BN = await BUSD.balanceOf(fusdt_wftm_lp_pair.address);
       let fusdt_amount = Number(getFullDisplayBalance(fusdt_amount_BN, BUSD.decimal));
+      console.log('@@@@@@@@@@ (fusdt_amount / ftm_amount).toString() @@@@@@@@@@@');
+      console.log((fusdt_amount / ftm_amount).toString());
       return (fusdt_amount / ftm_amount).toString();
     } catch (err) {
       console.error(`Failed to fetch token price of WBNB: ${err}`);
@@ -764,6 +808,7 @@ export class EmpFinance {
   }
 
   async getETHPriceFromPancakeswap(): Promise<string> {
+    console.log('@@@@@@@@@@ getETHPriceFromPancakeswap @@@@@@@@@@@');
     const ready = await this.provider.ready;
     if (!ready) return;
     const { ETH } = this.externalTokens;
@@ -773,7 +818,7 @@ export class EmpFinance {
       const wbnbPrice = await this.getWBNBPriceFromPancakeswap();
 
       const btcprice = (Number(btcPriceInBNB) * Number(wbnbPrice)).toFixed(2).toString();
-      //console.log('btcprice', btcprice);
+      console.log('btcprice', btcprice);
       return btcprice;
     } catch (err) {
       console.error(`Failed to fetch token price of ETH: ${err}`);
@@ -805,6 +850,7 @@ export class EmpFinance {
   //===================================================================
 
   async getBoardroomAPR(version: number) {
+    console.log('@@@@@@@@@@ getBoardroomAPR @@@@@@@@@@@');
     const Boardroom = this.currentBoardroom(version);
     const [latestSnapshotIndex, shareStat, empStat, boardroomtShareBalanceOf] = await Promise.all([
       Boardroom.latestSnapshotIndex(),
@@ -829,6 +875,7 @@ export class EmpFinance {
    * @returns true if user can withdraw reward, false if they can't
    */
   async canUserClaimRewardFromBoardroom(version: number): Promise<boolean> {
+    console.log('@@@@@@@@@@ canUserClaimRewardFromBoardroom @@@@@@@@@@@');
     const Boardroom = this.currentBoardroom(version);
     return await Boardroom.canClaimReward(this.myAccount);
   }
@@ -838,6 +885,7 @@ export class EmpFinance {
    * @returns true if user can withdraw reward, false if they can't
    */
   async canUserUnstakeFromBoardroom(version: number): Promise<boolean> {
+    console.log('@@@@@@@@@@ canUserUnstakeFromBoardroom @@@@@@@@@@@');
     const Boardroom = this.currentBoardroom(version);
     const canWithdraw = await Boardroom.canWithdraw(this.myAccount);
     const stakedAmount = await this.getStakedSharesOnBoardroom(version);
@@ -847,17 +895,20 @@ export class EmpFinance {
   }
 
   async timeUntilClaimRewardFromBoardroom(): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ timeUntilClaimRewardFromBoardroom @@@@@@@@@@@');
     // const Boardroom = this.currentBoardroom();
     // const mason = await Boardroom.masons(this.myAccount);
     return BigNumber.from(0);
   }
 
   async getTotalStakedInBoardroom(version: number): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getTotalStakedInBoardroom @@@@@@@@@@@');
     const Boardroom = this.currentBoardroom(version);
     return await Boardroom.totalSupply();
   }
 
   async stakeShareToBoardroom(version: number, amount: string): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ stakeShareToBoardroom @@@@@@@@@@@');
     if (this.isOldBoardroomMember()) {
       throw new Error("you're using old boardroom. please withdraw and deposit the ESHARE again.");
     }
@@ -866,6 +917,7 @@ export class EmpFinance {
   }
 
   async getStakedSharesOnBoardroom(version: number): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getStakedSharesOnBoardroom @@@@@@@@@@@');
     const Boardroom = this.currentBoardroom(version);
     if (this.boardroomVersionOfUser === 'v1') {
       return await Boardroom.getShareOf(this.myAccount);
@@ -874,6 +926,7 @@ export class EmpFinance {
   }
 
   async getEarningsOnBoardroom(version: number): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getEarningsOnBoardroom @@@@@@@@@@@');
     const Boardroom = this.currentBoardroom(version);
     if (this.boardroomVersionOfUser === 'v1') {
       return await Boardroom.getCashEarningsOf(this.myAccount);
@@ -882,11 +935,13 @@ export class EmpFinance {
   }
 
   async withdrawShareFromBoardroom(version: number, amount: string): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ withdrawShareFromBoardroom @@@@@@@@@@@');
     const Boardroom = this.currentBoardroom(version);
     return await Boardroom.withdraw(decimalToBalance(amount));
   }
 
   async harvestCashFromBoardroom(version: number): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ harvestCashFromBoardroom @@@@@@@@@@@');
     const Boardroom = this.currentBoardroom(version);
     if (this.boardroomVersionOfUser === 'v1') {
       return await Boardroom.claimDividends();
@@ -895,11 +950,13 @@ export class EmpFinance {
   }
 
   async exitFromBoardroom(version: number): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ exitFromBoardroom @@@@@@@@@@@');
     const Boardroom = this.currentBoardroom(version);
     return await Boardroom.exit();
   }
 
   async getTreasuryNextAllocationTime(version: number): Promise<AllocationTime> {
+    console.log('@@@@@@@@@@ getTreasuryNextAllocationTime @@@@@@@@@@@');
     const { Treasury, TreasuryV2 } = this.contracts;
     const nextEpochTimestamp: BigNumber = version === 0 ? await Treasury.nextEpochPoint() : await TreasuryV2.nextEpochPoint();
     const nextAllocation = new Date(nextEpochTimestamp.mul(1000).toNumber());
@@ -914,6 +971,7 @@ export class EmpFinance {
    * @returns Promise<AllocationTime>
    */
   async getUserClaimRewardTime(version: number): Promise<AllocationTime> {
+    console.log('@@@@@@@@@@ getUserClaimRewardTime @@@@@@@@@@@');
     const { Boardroom, BoardroomV2, Treasury, TreasuryV2 } = this.contracts;
     const selectedBoardroom = version === 0 ? Boardroom : BoardroomV2;
     const nextEpochTimestamp = await selectedBoardroom.nextEpochPoint(); //in unix timestamp
@@ -948,6 +1006,7 @@ export class EmpFinance {
    * @returns Promise<AllocationTime>
    */
   async getUserUnstakeTime(version: number): Promise<AllocationTime> {
+    console.log('@@@@@@@@@@ getUserUnstakeTime @@@@@@@@@@@');
     const { Boardroom, BoardroomV2, Treasury, TreasuryV2 } = this.contracts;
     const selectedBoardroom = version === 0 ? Boardroom : BoardroomV2;
     const nextEpochTimestamp = await selectedBoardroom.nextEpochPoint();
@@ -976,6 +1035,7 @@ export class EmpFinance {
   }
 
   async watchAssetInMetamask(assetName: string): Promise<boolean> {
+    console.log('@@@@@@@@@@ watchAssetInMetamask @@@@@@@@@@@');
     const { ethereum } = window as any;
     if (ethereum && ethereum.networkVersion === config.chainId.toString()) {
       let asset;
@@ -1007,6 +1067,7 @@ export class EmpFinance {
   }
 
   async provideEmpEthLP(ethAmount: BigNumber, empAmount: BigNumber): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ provideEmpEthLP @@@@@@@@@@@');
     const { TaxOfficeV2 } = this.contracts;
     // let overrides = {
     //   value: parseUnits(ftmAmount, 18),
@@ -1022,6 +1083,7 @@ export class EmpFinance {
   }
 
   async quoteFromSpooky(tokenAmount: string, tokenName: string): Promise<string> {
+    console.log('@@@@@@@@@@ quoteFromSpooky @@@@@@@@@@@');
     const { SpookyRouter } = this.contracts;
     const { _reserve0, _reserve1 } = await this.EMPETH_LP.getReserves();
     let quote;
@@ -1037,6 +1099,7 @@ export class EmpFinance {
    * @returns an array of the regulation events till the most up to date epoch
    */
   async listenForRegulationsEvents(version: number): Promise<any> {
+    console.log('@@@@@@@@@@ listenForRegulationsEvents @@@@@@@@@@@');
     const { Treasury, TreasuryV2 } = this.contracts;
     const selectedTreasury = version === 0 ? Treasury : TreasuryV2;
 
@@ -1104,12 +1167,14 @@ export class EmpFinance {
    * @returns the amount of bonds events emitted based on the filter provided during a specific period
    */
   async getBondsWithFilterForPeriod(version: number, filter: EventFilter, from: number, to: number): Promise<number> {
+    console.log('@@@@@@@@@@ getBondsWithFilterForPeriod @@@@@@@@@@@');
     const { Treasury, TreasuryV2 } = this.contracts;
     const bondsAmount = version === 0 ? await Treasury.queryFilter(filter, from, to) : await TreasuryV2.queryFilter(filter, from, to);
     return bondsAmount.length;
   }
 
   async estimateZapIn(tokenName: string, lpName: string, amount: string): Promise<number[]> {
+    console.log('@@@@@@@@@@ estimateZapIn @@@@@@@@@@@');
     const { Zapper } = this.contracts;
     const lpToken = this.externalTokens[lpName];
     let estimate;
@@ -1133,6 +1198,7 @@ export class EmpFinance {
     return [estimate[0] / 1e18, estimate[1] / 1e18];
   }
   async zapIn(tokenName: string, lpName: string, amount: string, slippageBp: string): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ zapIn @@@@@@@@@@@');
     const { ZapperV2 } = this.contracts;
     const lpToken = this.externalTokens[lpName];
     if (tokenName === BNB_TICKER) {
@@ -1162,6 +1228,7 @@ export class EmpFinance {
   }
 
   async zapStrategy(from: string, amount: string | BigNumber, percentEmpLP: string | number | BigNumber, gasLimit?: BigNumber): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ zapStrategy @@@@@@@@@@@');
     const { Strategy } = this.contracts;
     if (gasLimit)
       return await Strategy.zapStrategy(from, amount, percentEmpLP, { gasLimit: gasLimit.toNumber() });
@@ -1170,10 +1237,12 @@ export class EmpFinance {
   }
 
   async swapEBondToEShare(bbondAmount: BigNumber): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ swapEBondToEShare @@@@@@@@@@@');
     const { EShareSwapper } = this.contracts;
     return await EShareSwapper.swapEBondToEShare(bbondAmount);
   }
   async estimateAmountOfEShare(bbondAmount: string): Promise<string> {
+    console.log('@@@@@@@@@@ estimateAmountOfEShare @@@@@@@@@@@');
     const { EShareSwapper } = this.contracts;
     try {
       const estimateBN = await EShareSwapper.estimateAmountOfEShare(parseUnits(bbondAmount, 18));
@@ -1184,6 +1253,7 @@ export class EmpFinance {
   }
 
   async getEShareSwapperStat(address: string): Promise<EShareSwapperStat> {
+    console.log('@@@@@@@@@@ getEShareSwapperStat @@@@@@@@@@@');
     const { EShareSwapper } = this.contracts;
     const bshareBalanceBN = await EShareSwapper.getEShareBalance();
     const bbondBalanceBN = await EShareSwapper.getEBondBalance(address);
@@ -1202,64 +1272,76 @@ export class EmpFinance {
   }
 
   async getTotalStakedEth(): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getTotalStakedEth @@@@@@@@@@@');
     const { EthStaking } = this.contracts;
     return EthStaking.total_balance();
   }
  
   async getPendingPayoutEth(account: string): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getPendingPayoutEth @@@@@@@@@@@');
     const { EthStaking } = this.contracts;
     return EthStaking.pendingPayout(account);
   }
   
   async getMaxStakedEth(): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getMaxStakedEth @@@@@@@@@@@');
     const { EthStaking } = this.contracts;
     return EthStaking.maxBalance();
   }
   
   async getUserEthStake(account: string): Promise<any> {
+    console.log('@@@@@@@@@@ getUserEthStake @@@@@@@@@@@');
     const { EthStaking } = this.contracts;
     return EthStaking.users(account);
   }
   
   async getTimeToUnlock(): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getTimeToUnlock @@@@@@@@@@@');
     const { EthStaking } = this.contracts;
     const unlockTime = await EthStaking.timeToAvailable();
     return unlockTime;
   }
   
   async getTimeToLock(): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getTimeToLock @@@@@@@@@@@');
     const { EthStaking } = this.contracts;
     const lockTime = await EthStaking.timeToUnavailable();
     return lockTime;
   }
   
   async getEthEpoch(): Promise<{unlocked: boolean, epoch: BigNumber}> {
+    console.log('@@@@@@@@@@ getEthEpoch @@@@@@@@@@@');
     const { EthStaking } = this.contracts;
     const tuple = await EthStaking.checkEpoch();
     return { unlocked: tuple[0], epoch: tuple[1] };
   }
   
   async stakeEth(amount: BigNumber): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ stakeEth @@@@@@@@@@@');
     const { EthStaking } = this.contracts;
     return await EthStaking.stake(amount, { gasLimit: '1500000' });
   }
   
   async exitEth(earlyWithFee: boolean): Promise<TransactionResponse> {
+    console.log('@@@@@@@@@@ exitEth @@@@@@@@@@@');
     const { EthStaking } = this.contracts;
     return await EthStaking.exit(earlyWithFee, { gasLimit: '1500000' });
   }
 
   async isWhitelisted(address: string): Promise<Boolean> {
+    console.log('@@@@@@@@@@ isWhitelisted @@@@@@@@@@@');
     const { EthStaking } = this.contracts;
     return EthStaking.isWhitelisted(address);
   }
 
   async getUnlockTime(epoch: number): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getUnlockTime @@@@@@@@@@@');
     const { EthStaking } = this.contracts;
     return EthStaking.startEpochs(epoch);
   }
   
   async getLockTime(epoch: number): Promise<BigNumber> {
+    console.log('@@@@@@@@@@ getLockTime @@@@@@@@@@@');
     const { EthStaking } = this.contracts;
     return EthStaking.endEpochs(epoch);
   }

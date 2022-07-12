@@ -11,6 +11,7 @@ const useStakedTokenPriceInDollars = (stakedTokenName: string, stakedToken: ERC2
 
   const fetchBalance = useCallback(async () => {
     const balance = await empFinance.getDepositTokenPriceInDollars(stakedTokenName, stakedToken);
+    console.log('balance', balance);
     setStakedTokenPriceInDollars(balance);
   }, [stakedToken, stakedTokenName, empFinance]);
 
