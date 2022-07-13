@@ -1,5 +1,5 @@
 import { BigNumber } from 'ethers';
-import { ESHARE_TICKER } from './../utils/constants';
+import { ESHARE_TICKER, BNB_TICKER } from './../utils/constants';
 import { useCallback } from 'react';
 import useEmpFinance from './useEmpFinance';
 
@@ -15,8 +15,10 @@ const useStrategy = () => {
       harvestTxs.push(await empFinance.harvestCashFromBoardroom(1));
     if ((await empFinance.earnedFromBank('EShareBnbEShareRewardPool', ESHARE_TICKER, 0, empFinance.myAccount)).gt(ZERO))
       harvestTxs.push(await empFinance.harvest('EShareBnbEShareRewardPool', 0, 2));
-    if ((await empFinance.earnedFromBank('EmpEthEShareRewardPool', ESHARE_TICKER, 1, empFinance.myAccount)).gt(ZERO))
-      harvestTxs.push(await empFinance.harvest('EmpEthEShareRewardPool', 1, 2));
+    // if ((await empFinance.earnedFromBank('EmpEthEShareRewardPool', ESHARE_TICKER, 1, empFinance.myAccount)).gt(ZERO))
+    //   harvestTxs.push(await empFinance.harvest('EmpEthEShareRewardPool', 1, 2));
+    if ((await empFinance.earnedFromBank('UtaBnbLPRewardPool', BNB_TICKER, 1, empFinance.myAccount)).gt(ZERO))
+      harvestTxs.push(await empFinance.harvest('UtaBnbLPRewardPool', 1, 2));
 
     await Promise.all(harvestTxs.map((tx) => tx.wait()));
     let shareBoardroomAmount = ZERO;
@@ -24,9 +26,10 @@ const useStrategy = () => {
 
     for (let retries = 0; retries < 3; retries++) {
 
-      const [empBalance, shareBalance] = await Promise.all([
+      const [empBalance, shareBalance, utaBalance] = await Promise.all([
         empFinance.EMP.balanceOf(empFinance.myAccount),
-        empFinance.ESHARE.balanceOf(empFinance.myAccount)
+        empFinance.ESHARE.balanceOf(empFinance.myAccount),
+        empFinance.UTA.balanceOf(empFinance.myAccount)
       ]);
       const shareCompoundAmount = stakeBoardroom > 0 ? shareBalance.mul(100 - stakeBoardroom).div(100) : shareBalance;
       shareBoardroomAmount = stakeBoardroom > 0 && !zapsCompleted[1] ? shareBalance.sub(shareCompoundAmount) : ZERO;
@@ -38,6 +41,8 @@ const useStrategy = () => {
         zapTxs.push(await empFinance.zapStrategy(empFinance.EMP.address, empBalance, percentEmpLP, BigNumber.from('1500000').mul(retries + 1)));
       if (shareCompoundAmount.gt(BigNumber.from('500000000000000')) && !zapsCompleted[1])
         zapTxs.push(await empFinance.zapStrategy(empFinance.ESHARE.address, shareCompoundAmount, percentEmpLP, BigNumber.from('1500000').mul(retries + 1)));
+
+        
 
       try {
         for (; txIndex < zapTxs.length; txIndex++) {
@@ -52,8 +57,9 @@ const useStrategy = () => {
       }
     }
 
-    const [balanceEMPLP, balanceSHARELP] = await Promise.all([
+    const [balanceEMPLP, balanceSHARELP, balanceUTALP] = await Promise.all([
       empFinance.externalTokens['EMP-ETH-LP'].balanceOf(empFinance.myAccount),
+      empFinance.externalTokens['ESHARE-BNB-LP'].balanceOf(empFinance.myAccount),
       empFinance.externalTokens['ESHARE-BNB-LP'].balanceOf(empFinance.myAccount)
     ]);
 
@@ -65,7 +71,8 @@ const useStrategy = () => {
       stakeTxs.push(await empFinance.stake('EShareBnbEShareRewardPool', 0, 2, balanceSHARELP));
     if (stakeBoardroom > 0 && shareBoardroomAmount.gt(ZERO))
       stakeTxs.push(await empFinance.currentBoardroom(1).stake(shareBoardroomAmount));
-
+    if (balanceEMPLP.gt(ZERO))
+      stakeTxs.push(await empFinance.stake('UtaBnbLPRewardPool', 1, 2, balanceEMPLP));
     await Promise.all(stakeTxs.map((tx) => tx.wait()));
 
   }, [empFinance, ZERO]);

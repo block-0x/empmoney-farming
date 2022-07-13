@@ -1,4 +1,5 @@
 export const EMP_TICKER = 'EMP';
+export const UTA_TICKER = 'UTA';
 export const ESHARE_TICKER = 'ESHARE';
 export const EBOND_TICKER = 'EBOND';
 export const BNB_TICKER = 'BNB';

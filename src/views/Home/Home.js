@@ -377,7 +377,6 @@ const Home = () => {
           </Card>
         </Grid>
 
-        {/* ESHARE */}
         <Grid item xs={12} sm={4}>
           <Card>
             <CardContent align="center" style={{ position: 'relative' }}>

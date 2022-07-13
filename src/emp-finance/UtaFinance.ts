@@ -19,7 +19,7 @@ import { BNB_TICKER, SPOOKY_ROUTER_ADDR, EMP_TICKER } from '../utils/constants';
  * An API module of Emp Money contracts.
  * All contract-interacting domain logic should be defined in here.
  */
-export class EmpFinance {
+export class UtaFinance {
   myAccount: string;
   provider: ethers.providers.Web3Provider;
   signer?: ethers.Signer;
